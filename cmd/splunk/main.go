@@ -152,24 +152,29 @@ func Status(args []string) {
 		return
 	}
 
+	if r.StatusCode < 200 || r.StatusCode >= 300 {
+		exitf(-1, "Non-200: response: %s\n", r.Body)
+	}
+
 	var resp splunk.StatusResponse
 	err = json.Unmarshal(r.Body, &resp)
 	mustBeNil(err) // todo
 	for _, e := range resp.Entry {
-
 		c := e.Content
 		status := "  FINISHED"
 		if !c.IsDone {
 			status = "unfinished"
-		} else if c.DoneProgress == 1.0 {
-			status = "unknown"
+			if c.DoneProgress == 1.0 {
+				status = "unknown"
+			}
 		}
 		ttl := c.TTL
 		ts, err := timestampFromSID(c.Sid)
 		if err == nil {
 			ttl = int(ts + int64(c.TTL) - time.Now().Unix())
 		}
-		fmt.Printf("%0.2f [ttl = %d]\t%s %s\n", c.DoneProgress, ttl, c.Sid, status)
+
+		fmt.Printf("%0.2f %d/%d [ttl = %d]\t%s %s\n", c.DoneProgress, c.ResultCount, c.ResultPreviewCount, ttl, c.Sid, status)
 	}
 
 	// TODO
@@ -182,6 +187,7 @@ func Results(args []string) {
 	var sid string
 	var count int // 0 means get all results https://docs.splunk.com/Documentation/Splunk/7.2.3/RESTREF/RESTsearch#search.2Fjobs.2F.7Bsearch_id.7D.2Fresults
 
+	// todo creaete ParseArgsResults
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--raw":
@@ -215,12 +221,31 @@ func Results(args []string) {
 	}
 	mustBeNil(err) // todo
 	if raw {
+		// TODO rename raw to something more applicabile
 		fmt.Printf("%s\n", string(r.Body))
 		return
 	}
-	// todo
-	fmt.Printf("%s\n", string(r.Body))
+	var resp splunk.ResultsResponse
+	err = json.Unmarshal(r.Body, &resp)
+	mustBeNil(err) // todo
+	for _, r := range resp.Results {
+		var m map[string]interface{} // TODO is there a way for user to specify the structure type here? can we search for something specific? way in the future... perhaps a --highlight flag that bolds specified keys
+		err = json.Unmarshal([]byte(r.Raw_), &m)
+		if err != nil {
+			fmt.Printf("%s\n", r.Raw_)
+			continue
+		}
 
+		m["_host"] = r.Host
+		m["_time"] = r.Time_
+
+		byts, err := json.Marshal(m)
+		if err != nil {
+			fmt.Printf("%s\n", r.Raw_)
+			continue
+		}
+		fmt.Printf("%s\n", string(byts))
+	}
 }
 
 func main() {

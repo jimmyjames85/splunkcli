@@ -11,6 +11,37 @@ import (
 	"strings"
 )
 
+type ResultsResponse struct {
+	Highlighted map[string]struct{} `json:"highlighted"` // todo not wure what this is
+	Results     []struct {
+		Userid       string   `json:"userid"`
+		SplunkServer string   `json:"splunk_server"`
+		Sourcetype   string   `json:"sourcetype"`
+		Source       string   `json:"source"`
+		Linecount    string   `json:"linecount"`
+		Index        string   `json:"index"`
+		Host         string   `json:"host"`
+		Event        string   `json:"event"`
+		Bkt_         string   `json:"_bkt"`
+		Cd_          string   `json:"_cd"`
+		Indextime_   string   `json:"_indextime"`
+		Raw_         string   `json:"_raw"`
+		Serial_      string   `json:"_serial"`
+		Si_          []string `json:"_si"`
+		Sourcetype_  string   `json:"_sourcetype"`
+		Time_        string   `json:"_time"`
+	} `json:"results"`
+	Fields []struct {
+		Name string `json:"name"`
+	} `json:"fields"`
+	Messages []struct {
+		Text string `json:"text"`
+		Type string `json:"type"`
+	} `json:"messages"`
+	InitOffset int  `json:"init_offset"`
+	Preview    bool `json:"preview"`
+}
+
 type StatusResponse struct {
 	Paging struct {
 		Offset  int `json:"offset"`
