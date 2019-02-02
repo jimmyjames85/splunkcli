@@ -11,11 +11,137 @@ import (
 	"strings"
 )
 
+type StatusResponse struct {
+	Paging struct {
+		Offset  int `json:"offset"`
+		PerPage int `json:"perPage"`
+		Total   int `json:"total"`
+	} `json:"paging"`
+	Entry []struct {
+		Acl struct {
+			TTL        string `json:"ttl"`
+			CanWrite   bool   `json:"can_write"`
+			App        string `json:"app"`
+			Sharing    string `json:"sharing"`
+			Modifiable bool   `json:"modifiable"`
+			Owner      string `json:"owner"`
+			Perms      struct {
+				Write []string `json:"write"`
+				Read  []string `json:"read"`
+			} `json:"perms"`
+		} `json:"acl"`
+		Content struct {
+			RemoteSearchLogs                  []string               `json:"remoteSearchLogs"`
+			IsTimeCursored                    bool                   `json:"isTimeCursored"`
+			IsSavedSearch                     bool                   `json:"isSavedSearch"`
+			IsSaved                           bool                   `json:"isSaved"`
+			IsRemoteTimeline                  bool                   `json:"isRemoteTimeline"`
+			IsRealTimeSearch                  bool                   `json:"isRealTimeSearch"`
+			IsPreviewEnabled                  bool                   `json:"isPreviewEnabled"`
+			IsPaused                          bool                   `json:"isPaused"`
+			IsFinalized                       bool                   `json:"isFinalized"`
+			IsFailed                          bool                   `json:"isFailed"`
+			IsEventsPreviewEnabled            bool                   `json:"isEventsPreviewEnabled"`
+			IsDone                            bool                   `json:"isDone"`
+			IsBatchModeSearch                 bool                   `json:"isBatchModeSearch"`
+			IndexLatestTime                   int                    `json:"indexLatestTime"`
+			IndexEarliestTime                 int                    `json:"indexEarliestTime"`
+			EventSorting                      string                 `json:"eventSorting"`
+			EventSearch                       string                 `json:"eventSearch"`
+			DispatchState                     string                 `json:"dispatchState"`
+			DiskUsage                         int                    `json:"diskUsage"`
+			Delegate                          string                 `json:"delegate"`
+			DefaultTTL                        string                 `json:"defaultTTL"`
+			DefaultSaveTTL                    string                 `json:"defaultSaveTTL"`
+			CursorTime                        string                 `json:"cursorTime"`
+			CanSummarize                      bool                   `json:"canSummarize"`
+			BundleVersion                     string                 `json:"bundleVersion"`
+			DoneProgress                      float64                `json:"doneProgress"`
+			DropCount                         int                    `json:"dropCount"`
+			EarliestTime                      string                 `json:"earliestTime"`
+			EventAvailableCount               int                    `json:"eventAvailableCount"`
+			EventCount                        int                    `json:"eventCount"`
+			EventFieldCount                   int                    `json:"eventFieldCount"`
+			EventIsStreaming                  bool                   `json:"eventIsStreaming"`
+			EventIsTruncated                  bool                   `json:"eventIsTruncated"`
+			IsZombie                          bool                   `json:"isZombie"`
+			Keywords                          string                 `json:"keywords"`
+			Label                             string                 `json:"label"`
+			LatestTime                        string                 `json:"latestTime"`
+			NormalizedSearch                  string                 `json:"normalizedSearch"`
+			NumPreviews                       int                    `json:"numPreviews"`
+			OptimizedSearch                   string                 `json:"optimizedSearch"`
+			Pid                               string                 `json:"pid"`
+			Priority                          int                    `json:"priority"`
+			Provenance                        string                 `json:"provenance"`
+			RemoteSearch                      string                 `json:"remoteSearch"`
+			ReportSearch                      string                 `json:"reportSearch"`
+			ResultCount                       int                    `json:"resultCount"`
+			ResultIsStreaming                 bool                   `json:"resultIsStreaming"`
+			ResultPreviewCount                int                    `json:"resultPreviewCount"`
+			RunDuration                       float64                `json:"runDuration"`
+			SampleRatio                       string                 `json:"sampleRatio"`
+			SampleSeed                        string                 `json:"sampleSeed"`
+			ScanCount                         int                    `json:"scanCount"`
+			SearchCanBeEventType              bool                   `json:"searchCanBeEventType"`
+			SearchEarliestTime                int                    `json:"searchEarliestTime"`
+			SearchLatestTime                  float64                `json:"searchLatestTime"`
+			SearchTotalBucketsCount           int                    `json:"searchTotalBucketsCount"`
+			SearchTotalEliminatedBucketsCount int                    `json:"searchTotalEliminatedBucketsCount"`
+			Sid                               string                 `json:"sid"`
+			StatusBuckets                     int                    `json:"statusBuckets"`
+			TTL                               int                    `json:"ttl"`
+			Performance                       map[string]interface{} `json:"performance"`
+			Messages                          []struct {
+				Text string `json:"text"`
+				Type string `json:"type"`
+			} `json:"messages"`
+			Request struct {
+				Search string `json:"search"`
+			} `json:"request"`
+			Runtime struct {
+				AutoPause  string `json:"auto_pause"`
+				AutoCancel string `json:"auto_cancel"`
+			} `json:"runtime"`
+			SearchProviders []string `json:"searchProviders"`
+		} `json:"content"`
+		Author    string `json:"author"`
+		Published string `json:"published"`
+		Links     struct {
+			Control        string `json:"control"`
+			Summary        string `json:"summary"`
+			Timeline       string `json:"timeline"`
+			ResultsPreview string `json:"results_preview"`
+			Results        string `json:"results"`
+			Events         string `json:"events"`
+			SearchLog      string `json:"search.log"`
+			Alternate      string `json:"alternate"`
+		} `json:"links"`
+		Updated string `json:"updated"`
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+	} `json:"entry"`
+	Generator struct {
+		Version string `json:"version"`
+		Build   string `json:"build"`
+	} `json:"generator"`
+	Updated string `json:"updated"`
+	Origin  string `json:"origin"`
+	Links   struct {
+	} `json:"links"`
+}
+
+type PastSearch struct {
+	SearchID string
+	Search   string
+	// Date time executed
+}
+
 type Client struct {
-	Username  string            `json:"username"`
-	SessionID string            `json:"session_id"`
-	Addr      string            `json:"addr"`
-	Searches  map[string]string `json:"searches"`
+	Username  string       `json:"username"`
+	SessionID string       `json:"session_id"`
+	Addr      string       `json:"addr"`
+	Searches  []PastSearch `json:"searches"`
 	httpcli   http.Client
 }
 
@@ -33,7 +159,7 @@ func (c *Client) SaveTo(fileloc string) error {
 }
 
 func LoadClient(fileloc string) (*Client, error) {
-	ret := Client{Searches: make(map[string]string)}
+	ret := Client{}
 
 	// open and parse json settings file
 	file, err := os.Open(fileloc)
@@ -49,7 +175,7 @@ func LoadClient(fileloc string) (*Client, error) {
 	return &ret, nil
 }
 
-func New(addr string) *Client { return &Client{Addr: addr, Searches: make(map[string]string)} }
+func New(addr string) *Client { return &Client{Addr: addr} }
 
 //  NewSessionID attempts to authenticate with `addr` using `username`
 //  and `password` and returns a sessionID if successful. An optional
@@ -151,8 +277,11 @@ func (c *Client) Search(search string, opts ...Option) (SearchResponse, error) {
 	if err != nil {
 		return ret, err
 	}
-	c.Searches[exp.SearchID] = search
-	ret.SearchID = search
+	c.Searches = append(c.Searches, PastSearch{
+		SearchID: exp.SearchID,
+		Search:   search,
+	})
+	ret.SearchID = exp.SearchID
 	return ret, nil
 }
 
@@ -234,6 +363,9 @@ func (c *Client) GetSearchStatus(searchID string) (Response, error) {
 	}
 	ret.StatusCode = resp.StatusCode
 
+	// TODO ./s status 4 | jq '.entry | .[] | .content.isDone'
+	// .entry.[].content.isDone
+
 	if ret.AuthFailed() {
 		return ret, ErrAuth
 	}
@@ -242,20 +374,22 @@ func (c *Client) GetSearchStatus(searchID string) (Response, error) {
 }
 
 func (c *Client) ClearKnownSearches() error {
-	var rm []string
-	for sid, _ := range c.Searches {
-		_, err := c.GetSearchStatus(sid)
+	var save []PastSearch
+	for _, s := range c.Searches {
+		r, err := c.GetSearchStatus(s.SearchID)
 		if err == ErrAuth {
 			// dont clear if we can't communicate
 			return ErrAuth
 		}
 		if err != nil {
-			rm = append(rm, sid)
+			return err
 		}
+		if r.StatusCode >= 200 && r.StatusCode < 300 {
+			save = append(save, s)
+		}
+
 	}
-	for _, sid := range rm {
-		delete(c.Searches, sid)
-	}
+	c.Searches = save
 	return nil
 }
 
