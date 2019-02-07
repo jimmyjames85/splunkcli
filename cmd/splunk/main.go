@@ -115,7 +115,6 @@ func StatusAll() {
 		}
 		fmt.Printf("%d: %s %s: %s\n", i, date, s.SearchID, s.Search) // todo display date
 	}
-	println()
 	return
 }
 
