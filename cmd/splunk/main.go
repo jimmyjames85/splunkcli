@@ -10,7 +10,6 @@ import (
 
 	"github.com/howeyc/gopass"
 	"github.com/jimmyjames85/splunkcli/pkg/splunk"
-	"github.com/pkg/errors"
 )
 
 func promptHidden(format string, args ...interface{}) string {
@@ -31,41 +30,64 @@ func prompt(format string, args ...interface{}) string {
 
 func exists(fileloc string) bool { _, err := os.Stat(fileloc); return !os.IsNotExist(err) }
 
-func DoInit(fileloc string) (*splunk.Client, error) {
-
-	if exists(fileloc) {
+func DoInit(args []string) {
+	if exists(configLocation) {
 		// prompt if file exists
 		resp := strings.ToLower(strings.TrimSpace(prompt("Init file already exists. Do you want to overwrite: ")))
 		if len(resp) == 0 || resp[0] != 'y' {
-			return nil, fmt.Errorf("user aborted")
+			exitf(0, "")
 		}
 	}
-
 	addr := prompt("Splunk Address: ") // https://localhost:8089
 	cli := splunk.New(addr)
-	_, err := DoCreateSessionID(cli)
+	// save and then DoLogin
+	err := cli.SaveTo(configLocation)
 	if err != nil {
-		return nil, err
+		exitf(-1, "%v", err.Error())
 	}
-	err = cli.SaveTo(fileloc)
-	if err != nil {
-		return nil, err
-	}
-	return cli, nil
+	DoLogin(args)
 }
 
-func DoCreateSessionID(cli *splunk.Client) (string, error) {
+func DoLogin(args []string) {
+	cli := mustLoadClient()
 	user := prompt("username: ")
 	pass := promptHidden("password: ")
-	sid, err := cli.RenewSessionID(user, pass)
+	_, err := cli.RenewSessionID(user, pass)
 	if err != nil {
-		return "", errors.Wrapf(err, "unable to authenticate with %s", cli.Addr)
+		exitf(-1, "unable to authenticate with %s", cli.Addr)
 	}
-	return sid, nil
+	cli.SaveTo(configLocation)
+}
+
+func DoClear(args []string) {
+	cli := mustLoadClient()
+	err := cli.ClearKnownSearches()
+	if err != nil {
+		exitf(-1, "error clearin searches: %s\n", err.Error())
+	}
+	cli.SaveTo(configLocation)
+}
+
+func DoSearch(args []string) {
+	if len(args) == 0 {
+		exitf(-1, "Please provide search\n")
+	}
+	search := os.Args[1] // fmt.Sprintf("search earliest=-1h host=*filter* event=FilterReceived OR event=processed OR event=drop")
+
+	if strings.Index(strings.ToLower(search), "earliest") == -1 {
+		fmt.Printf("%s\n", search)
+		exitf(-1, "please specify time range: TODO get url or documentation\n")
+	}
+	cli := mustLoadClient()
+	r, err := cli.Search(search)
+	if err != nil {
+		exitf(-1, "search error: %s", err.Error())
+	}
+	fmt.Printf("{\"searchID\": %q}\n", r.SearchID)
+	cli.SaveTo(configLocation)
 }
 
 func mustLoadClient() *splunk.Client {
-
 	cli, err := splunk.LoadClient(configLocation)
 	if err != nil {
 		exitf(-1, "failed to load config file: %s: %s\ntry %s init\n", configLocation, err.Error(), os.Args[0])
@@ -87,10 +109,6 @@ func mustBeNil(err error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func StatusHelp() string {
-	return "status HELP"
 }
 
 var configLocation = fmt.Sprintf("%s/.splunk", os.Getenv("HOME"))
@@ -118,7 +136,7 @@ func StatusAll() {
 	return
 }
 
-func Status(args []string) {
+func DoStatus(args []string) {
 	if len(args) == 0 {
 		StatusAll()
 		return
@@ -180,7 +198,7 @@ func Status(args []string) {
 
 }
 
-func Results(args []string) {
+func DoResults(args []string) {
 	cli := mustLoadClient()
 	var raw bool
 	var sid string
@@ -240,7 +258,13 @@ func Results(args []string) {
 
 		byts, err := json.Marshal(m)
 		if err != nil {
-			fmt.Printf("%s\n", r.Raw_)
+			if r.Sourcetype_ == "json" {
+				fmt.Printf("%s\n", r.Raw_)
+			} else {
+				// todo add flag to bypass
+				fmt.Printf("%q\n", r.Raw_)
+			}
+
 			continue
 		}
 		fmt.Printf("%s\n", string(byts))
@@ -248,52 +272,35 @@ func Results(args []string) {
 }
 
 func main() {
-	////////// load config location
-
 	if len(os.Args) < 2 {
-		printHelp()
 		exitf(-1, "Please provide an argument\n")
 	}
 
-	cli := mustLoadClient()
 	command := os.Args[1]
+	args := os.Args[2:]
 	switch command {
 	case "init":
-		_, err := DoInit(configLocation)
-		if err != nil {
-			exitf(-1, "%s\n", err.Error())
-		}
+		DoInit(args)
 		return
 	case "login":
-		_, err := DoCreateSessionID(cli)
-		mustBeNil(err)
-		err = cli.SaveTo(configLocation)
-		mustBeNil(err)
+		DoLogin(args)
+		return
 	case "search":
-		if len(os.Args) < 3 {
-			exitf(-1, "Please provide search\n")
-		}
-		search := os.Args[2] // fmt.Sprintf("search earliest=-1h host=*filter* event=FilterReceived OR event=processed OR event=drop")
-
-		if strings.Index(strings.ToLower(search), "earliest") == -1 {
-			fmt.Printf("%s\n", search)
-			exitf(-1, "please specify time range: TODO get url or documentation\n")
-		}
-		r, err := cli.Search(search)
-		mustBeNil(err)
-		fmt.Printf("{\"searchID\": %q}\n", r.SearchID)
-		cli.SaveTo(configLocation)
+		DoSearch(args)
+		return
 	case "clear":
-		err := cli.ClearKnownSearches()
-		mustBeNil(err)
-		cli.SaveTo(configLocation)
+		DoClear(args)
+		return
 	case "status":
-		Status(os.Args[2:])
+		DoStatus(args)
+		return
 	case "results":
-		Results(os.Args[2:])
-	default:
+		DoResults(args)
+		return
+	case "help":
 		printHelp()
-		exitf(-1, "unkown cmd: %s\n", command)
-		os.Exit(-1)
+		return
+	default:
+		exitf(-1, "unkown command: %s\n", command)
 	}
 }
