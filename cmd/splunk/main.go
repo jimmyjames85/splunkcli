@@ -72,7 +72,7 @@ func DoSearch(args []string) {
 	if len(args) == 0 {
 		exitf(-1, "Please provide search\n")
 	}
-	search := os.Args[1] // fmt.Sprintf("search earliest=-1h host=*filter* event=FilterReceived OR event=processed OR event=drop")
+	search := args[0] // fmt.Sprintf("search earliest=-1h host=*filter* event=FilterReceived OR event=processed OR event=drop")
 
 	if strings.Index(strings.ToLower(search), "earliest") == -1 {
 		fmt.Printf("%s\n", search)
